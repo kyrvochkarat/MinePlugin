@@ -49,36 +49,12 @@ namespace LandminePlugin
             Player owner = ev.Player;
             ushort serial = ev.Item.Serial;
 
-            Timing.RunCoroutine(WaitForLandAndSpawnMine(owner, serial));
+            Timing.RunCoroutine(WaitForLand(owner, serial));
 
             base.OnDroppingItem(ev);
         }
 
-        private void OnChangingRole(ChangingRoleEventArgs ev)
-        {
-            if (ev.NewRole != RoleTypeId.NtfCaptain) return;
-
-            Timing.CallDelayed(1.5f, () =>
-            {
-                if (ev.Player == null || !ev.Player.IsAlive) return;
-                if (ev.Player.Role.Type != RoleTypeId.NtfCaptain) return;
-
-                int count = LandminePlugin.Instance.Config.MinesPerCaptain;
-                for (int i = 0; i < count; i++)
-                {
-                    Give(ev.Player);
-                }
-
-                ev.Player.ShowHint(
-                    $"<color=yellow>⚠ Вы получили {count} мин(ы)!</color>\n" +
-                    "<color=white>Выбросьте монетку чтобы установить мину.\n" +
-                    "Мина активируется через 5 секунд.</color>",
-                    5f
-                );
-            });
-        }
-
-        private IEnumerator<float> WaitForLandAndSpawnMine(Player owner, ushort serial)
+        private IEnumerator<float> WaitForLand(Player owner, ushort serial)
         {
             Exiled.API.Features.Pickups.Pickup pickup = null;
 
@@ -113,21 +89,8 @@ namespace LandminePlugin
 
                 if (delta < 0.01f)
                 {
-                    Vector3 minePosition = currentPosition;
+                    SpawnMine(owner, currentPosition);
                     pickup.Destroy();
-
-                    var mine = new LandmineObject(owner, minePosition);
-                    _activeMines.Add(mine);
-
-                    if (owner != null && owner.IsAlive)
-                    {
-                        owner.ShowHint(
-                            "<color=yellow>💣 Мина установлена!</color>\n" +
-                            $"<color=white>Активация через {LandminePlugin.Instance.Config.ArmingTime} сек. Отойдите!</color>",
-                            3f
-                        );
-                    }
-
                     yield break;
                 }
 
@@ -136,12 +99,47 @@ namespace LandminePlugin
 
             if (pickup != null && pickup.Base != null)
             {
-                Vector3 minePosition = pickup.Position;
+                SpawnMine(owner, pickup.Position);
                 pickup.Destroy();
-
-                var mine = new LandmineObject(owner, minePosition);
-                _activeMines.Add(mine);
             }
+        }
+
+        private void SpawnMine(Player owner, Vector3 position)
+        {
+            var mine = new LandmineObject(owner, position);
+            _activeMines.Add(mine);
+
+            if (owner != null && owner.IsAlive)
+            {
+                owner.ShowHint(
+                    "<color=yellow>💣 Мина установлена!</color>\n" +
+                    $"<color=white>Активация через {LandminePlugin.Instance.Config.ArmingTime} сек.</color>",
+                    3f
+                );
+            }
+        }
+
+        private void OnChangingRole(ChangingRoleEventArgs ev)
+        {
+            if (ev.NewRole != RoleTypeId.NtfCaptain) return;
+
+            Timing.CallDelayed(1.5f, () =>
+            {
+                if (ev.Player == null || !ev.Player.IsAlive) return;
+                if (ev.Player.Role.Type != RoleTypeId.NtfCaptain) return;
+
+                int count = LandminePlugin.Instance.Config.MinesPerCaptain;
+                for (int i = 0; i < count; i++)
+                {
+                    Give(ev.Player);
+                }
+
+                ev.Player.ShowHint(
+                    $"<color=yellow>⚠ Вы получили {count} мин(ы)!</color>\n" +
+                    "<color=white>Выбросьте монетку чтобы установить мину.</color>",
+                    5f
+                );
+            });
         }
 
         public void CleanupAllMines()

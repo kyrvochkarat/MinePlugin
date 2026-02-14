@@ -1,14 +1,13 @@
 ﻿using UnityEngine;
 using Exiled.API.Features;
 using Exiled.API.Features.Toys;
-using Mirror;
 
 namespace LandminePlugin
 {
     public class LandmineObject
     {
         public LandmineBehaviour Behaviour { get; private set; }
-        public bool IsExploded => Behaviour == null || Behaviour.gameObject == null;
+        public bool IsExploded => Behaviour == null || Behaviour.gameObject == null || Behaviour.IsExploded;
 
         public LandmineObject(Player owner, Vector3 position)
         {
@@ -23,16 +22,32 @@ namespace LandminePlugin
             );
 
             primitive.Color = new Color(0.2f, 0.4f, 0.1f, 1f);
-            primitive.Collidable = false;
+            primitive.Collidable = true;
 
-            GameObject mineObject = new GameObject("Landmine");
-            mineObject.transform.position = position;
+            GameObject primitiveGo = primitive.Base.gameObject;
 
-            Behaviour = mineObject.AddComponent<LandmineBehaviour>();
+            Rigidbody rb = primitiveGo.GetComponent<Rigidbody>();
+            if (rb == null)
+                rb = primitiveGo.AddComponent<Rigidbody>();
+            rb.isKinematic = true;
+            rb.useGravity = false;
+
+            BoxCollider col = primitiveGo.GetComponent<BoxCollider>();
+            if (col == null)
+                col = primitiveGo.AddComponent<BoxCollider>();
+            col.isTrigger = false;
+            col.size = new Vector3(config.TriggerRadius * 2f, 1f, config.TriggerRadius * 2f);
+            col.center = Vector3.zero;
+
+            SphereCollider trigger = primitiveGo.AddComponent<SphereCollider>();
+            trigger.isTrigger = true;
+            trigger.radius = config.TriggerRadius;
+            trigger.center = Vector3.zero;
+
+            Behaviour = primitiveGo.AddComponent<LandmineBehaviour>();
             Behaviour.Owner = owner;
             Behaviour.Primitive = primitive;
             Behaviour.ArmingTime = config.ArmingTime;
-            Behaviour.ExplosionDamage = config.ExplosionDamage;
             Behaviour.ExplosionRadius = config.ExplosionRadius;
             Behaviour.TriggerRadius = config.TriggerRadius;
         }

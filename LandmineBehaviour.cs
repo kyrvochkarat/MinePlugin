@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections;
 using UnityEngine;
 using Exiled.API.Features;
 using Exiled.API.Features.Items;
@@ -13,12 +12,11 @@ namespace LandminePlugin
         public Player Owner { get; set; }
         public Primitive Primitive { get; set; }
         public float ArmingTime { get; set; }
-        public float ExplosionDamage { get; set; }
         public float ExplosionRadius { get; set; }
         public float TriggerRadius { get; set; }
+        public bool IsExploded { get; private set; } = false;
 
         private bool _isArmed = false;
-        private bool _isExploded = false;
         private float _spawnTime;
         private float _ownerSafeTime;
 
@@ -26,55 +24,63 @@ namespace LandminePlugin
         {
             _spawnTime = Time.time;
             _ownerSafeTime = ArmingTime + 3f;
-            StartCoroutine(ArmingCoroutine());
-        }
-
-        private IEnumerator ArmingCoroutine()
-        {
-            yield return new WaitForSeconds(ArmingTime);
-            _isArmed = true;
-
-            if (Primitive != null && Primitive.Base != null)
-            {
-                Primitive.Color = new Color(0.6f, 0.1f, 0.1f, 1f);
-            }
         }
 
         private void Update()
         {
-            if (!_isArmed || _isExploded) return;
+            if (IsExploded || _isArmed) return;
 
-            float timeSinceSpawn = Time.time - _spawnTime;
-
-            foreach (var player in Player.List)
+            if (Time.time - _spawnTime >= ArmingTime)
             {
-                if (player == null || !player.IsAlive) continue;
-
-                if (player == Owner && timeSinceSpawn < _ownerSafeTime)
-                    continue;
-
-                float distance = Vector3.Distance(player.Position, transform.position);
-
-                if (distance <= TriggerRadius)
+                _isArmed = true;
+                if (Primitive != null && Primitive.Base != null)
                 {
-                    Explode();
-                    return;
+                    Primitive.Color = new Color(0.6f, 0.1f, 0.1f, 1f);
                 }
             }
         }
 
+        private void OnCollisionEnter(Collision collision)
+        {
+            if (!_isArmed || IsExploded) return;
+
+            if (!Player.TryGet(collision.gameObject, out var player)) return;
+            if (player == null || !player.IsAlive) return;
+            if (player == Owner && Time.time - _spawnTime < _ownerSafeTime) return;
+
+            Explode();
+        }
+
+        private void OnTriggerEnter(Collider other)
+        {
+            if (!_isArmed || IsExploded) return;
+
+            if (!Player.TryGet(other.gameObject, out var player)) return;
+            if (player == null || !player.IsAlive) return;
+            if (player == Owner && Time.time - _spawnTime < _ownerSafeTime) return;
+
+            Explode();
+        }
+
         private void Explode()
         {
-            if (_isExploded) return;
-            _isExploded = true;
+            if (IsExploded) return;
+            IsExploded = true;
 
             Vector3 pos = transform.position + Vector3.up * 0.2f;
 
-            ExplosiveGrenade grenade = (ExplosiveGrenade)Item.Create(ItemType.GrenadeHE);
-            grenade.MaxRadius = ExplosionRadius;
-            grenade.ScpDamageMultiplier = 1f;
-            grenade.FuseTime = 0.1f;
-            grenade.SpawnActive(pos, Owner);
+            try
+            {
+                ExplosiveGrenade grenade = (ExplosiveGrenade)Item.Create(ItemType.GrenadeHE);
+                grenade.MaxRadius = ExplosionRadius;
+                grenade.ScpDamageMultiplier = 1f;
+                grenade.FuseTime = 0.1f;
+                grenade.SpawnActive(pos, Owner);
+            }
+            catch (Exception ex)
+            {
+                Log.Error($"Explosion error: {ex}");
+            }
 
             DestroyPrimitive();
             Destroy(gameObject);
@@ -82,38 +88,25 @@ namespace LandminePlugin
 
         private void DestroyPrimitive()
         {
-            try
+            if (Primitive != null && Primitive.Base != null)
             {
-                if (Primitive != null && Primitive.Base != null)
-                {
-                    NetworkServer.Destroy(Primitive.Base.gameObject);
-                    Primitive = null;
-                }
-            }
-            catch (Exception ex)
-            {
-                Log.Error($"Cleanup error: {ex}");
+                try { NetworkServer.Destroy(Primitive.Base.gameObject); } catch { }
+                Primitive = null;
             }
         }
 
         private void OnDestroy()
         {
-            StopAllCoroutines();
-
             if (Primitive != null && Primitive.Base != null)
             {
-                try
-                {
-                    NetworkServer.Destroy(Primitive.Base.gameObject);
-                }
-                catch { }
+                try { NetworkServer.Destroy(Primitive.Base.gameObject); } catch { }
                 Primitive = null;
             }
         }
 
         public void ForceDestroy()
         {
-            _isExploded = true;
+            IsExploded = true;
             DestroyPrimitive();
             Destroy(gameObject);
         }
