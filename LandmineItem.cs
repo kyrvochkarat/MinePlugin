@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using Exiled.API.Features;
 using Exiled.API.Features.Spawn;
 using Exiled.CustomItems.API.Features;
@@ -17,7 +17,7 @@ namespace LandminePlugin
         public override ItemType Type { get; set; } = ItemType.Coin;
         public override SpawnProperties SpawnProperties { get; set; } = new SpawnProperties();
 
-        private readonly List<LandmineObject> _activeMines = new List<LandmineObject>();
+        public List<LandmineObject> ActiveMines { get; } = new List<LandmineObject>();
 
         protected override void SubscribeEvents()
         {
@@ -72,7 +72,7 @@ namespace LandminePlugin
             }
 
             var mine = new LandmineObject(ev.Player, position);
-            _activeMines.Add(mine);
+            ActiveMines.Add(mine);
 
             ev.Player.ShowHint(
                 "<color=yellow>💣 Мина установлена!</color>\n" +
@@ -85,11 +85,11 @@ namespace LandminePlugin
 
         public void CleanupAllMines()
         {
-            for (int i = _activeMines.Count - 1; i >= 0; i--)
+            for (int i = ActiveMines.Count - 1; i >= 0; i--)
             {
-                _activeMines[i]?.Destroy();
+                ActiveMines[i]?.Destroy();
             }
-            _activeMines.Clear();
+            ActiveMines.Clear();
         }
     }
 }

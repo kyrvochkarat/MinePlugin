@@ -11,5 +11,7 @@ namespace LandminePlugin
         public float TriggerRadius { get; set; } = 1.5f;
         public float ExplosionRadius { get; set; } = 5f;
         public int MinesPerCaptain { get; set; } = 2;
+        public float DefuseRadius { get; set; } = 3f;
+        public int DefusesPerGuard { get; set; } = 2;
     }
 }
