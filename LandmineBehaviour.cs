@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 using Exiled.API.Features;
 using Exiled.API.Features.Items;
 using Exiled.API.Features.Toys;
@@ -27,35 +27,36 @@ namespace LandminePlugin
 
         private void Update()
         {
-            if (IsExploded) return;
+            if (IsExploded || _isArmed) return;
 
-            if (!_isArmed)
+            if (Time.time - _spawnTime >= ArmingTime)
             {
-                if (Time.time - _spawnTime >= ArmingTime)
+                _isArmed = true;
+                if (Primitive != null && Primitive.Base != null)
                 {
-                    _isArmed = true;
-                    if (Primitive != null && Primitive.Base != null)
-                    {
-                        Primitive.Color = new Color(0.6f, 0.1f, 0.1f, 1f);
-                    }
-                }
-                return;
-            }
-
-            float timeSinceSpawn = Time.time - _spawnTime;
-
-            foreach (var player in Player.List)
-            {
-                if (player == null || !player.IsAlive) continue;
-                if (player == Owner && timeSinceSpawn < _ownerSafeTime) continue;
-
-                float distance = Vector3.Distance(player.Position, transform.position);
-                if (distance <= TriggerRadius)
-                {
-                    Explode();
-                    return;
+                    Primitive.Color = new Color(0.6f, 0.1f, 0.1f, 1f);
                 }
             }
+        }
+
+        private void OnCollisionEnter(Collision collision)
+        {
+            TryExplode(collision.gameObject);
+        }
+
+        private void OnTriggerEnter(Collider other)
+        {
+            TryExplode(other.gameObject);
+        }
+
+        private void TryExplode(GameObject obj)
+        {
+            if (!_isArmed || IsExploded) return;
+            if (!Player.TryGet(obj, out var player)) return;
+            if (!player.IsAlive) return;
+            if (player == Owner && Time.time - _spawnTime < _ownerSafeTime) return;
+
+            Explode();
         }
 
         private void Explode()
